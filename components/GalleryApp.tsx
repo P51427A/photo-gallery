@@ -11,6 +11,7 @@ type Photo = {
   title: string;
   tags: string[];
   takenAt: string; // ISO
+  displayName?: string;
 };
 
 
@@ -379,6 +380,8 @@ function Lightbox({
   isFav: (id: string) => boolean;
   onToggleFav: () => void;
 }) {
+  const display = photo.displayName || photo.title || "Untitled"; // ✅ add this
+
   return (
     <div
       role="dialog"
@@ -387,11 +390,13 @@ function Lightbox({
       onClick={onClose}
     >
       <div className="relative max-w-6xl max-h-[85vh] w-full" onClick={(e) => e.stopPropagation()}>
-        <img src={photo.src} alt={photo.title} className="mx-auto max-h-[75vh] object-contain w-full" />
+        <img src={photo.src} alt={display} className="mx-auto max-h-[75vh] object-contain w-full" />
         <div className="mt-3 flex items-center justify-between text-white/90">
           <div>
-            <h2 className="text-lg font-semibold">{photo.title}</h2>
-            <p className="text-sm text-white/70">{new Date(photo.takenAt).toLocaleString()}</p>
+            <h2 className="text-lg font-semibold">{display}</h2>
+            <p className="text-sm text-white/70">
+              {photo.takenAt ? new Date(photo.takenAt).toLocaleString() : ""}
+            </p>
           </div>
           <div className="flex gap-2 items-center">
             <button
