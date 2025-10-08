@@ -13,7 +13,19 @@ type Photo = {
   takenAt: string; // ISO
 };
 
-/* --- Demo data (no tags now) --- */
+// add near the top of the component (keep your other state)
+useEffect(() => {
+  let cancelled = false;
+  (async () => {
+    const res = await fetch("/api/photos", { cache: "no-store" });
+    const data = await res.json();
+    if (!cancelled) setPhotos(data.photos);
+  })();
+  return () => { cancelled = true; };
+}, []);
+
+
+/* --- Demo data (no tags now) --- 
 const DEMO_PHOTOS: Photo[] = Array.from({ length: 36 }).map((_, i) => {
   const id = i + 1;
   return {
@@ -25,7 +37,7 @@ const DEMO_PHOTOS: Photo[] = Array.from({ length: 36 }).map((_, i) => {
     tags: [],
     takenAt: new Date(2024, (i * 2) % 12, (i % 28) + 1).toISOString(),
   };
-});
+});*/
 
 /* --- Utils --- */
 const unique = (arr: string[]) => Array.from(new Set(arr));
@@ -136,7 +148,14 @@ export default function GalleryApp() {
           <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
             <SearchBox value={query} onChange={setQuery} />
             <SortSelect value={sort} onChange={setSort} />
-          </div>
+            <UploadButton
+                onUploaded={async () => {
+                const res = await fetch("/api/photos", { cache: "no-store" });
+                const data = await res.json();
+                setPhotos(data.photos);
+                }}
+            />
+            </div>
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-3">
           <CategoryTabs
