@@ -2,8 +2,19 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-// ======= Demo data (replace with your API) =======
-const DEMO_PHOTOS = Array.from({ length: 36 }).map((_, i) => {
+/* --- Types --- */
+type Photo = {
+  id: string;
+  src: string;
+  width: number;
+  height: number;
+  title: string;
+  tags: string[];
+  takenAt: string; // ISO
+};
+
+/* --- Demo data (no tags now) --- */
+const DEMO_PHOTOS: Photo[] = Array.from({ length: 36 }).map((_, i) => {
   const id = i + 1;
   return {
     id: String(id),
@@ -16,40 +27,44 @@ const DEMO_PHOTOS = Array.from({ length: 36 }).map((_, i) => {
   };
 });
 
-const unique = (arr) => Array.from(new Set(arr));
-function classNames(...xs) {
+/* --- Utils --- */
+const unique = (arr: string[]) => Array.from(new Set(arr));
+function classNames(...xs: Array<string | false | null | undefined>) {
   return xs.filter(Boolean).join(" ");
 }
 
+/* --- Component --- */
 export default function GalleryApp() {
-  const [photos, setPhotos] = useState(DEMO_PHOTOS);
-  const [query, setQuery] = useState("");
-  const [sort, setSort] = useState("newest");
+  const [photos, setPhotos] = useState<Photo[]>(DEMO_PHOTOS);
+  const [query, setQuery] = useState<string>("");
+  const [sort, setSort] = useState<"newest" | "oldest" | "title">("newest");
 
-  const [category, setCategory] = useState("all"); // all | favourites
-  const [favs, setFavs] = useState(() => {
+  // categories & favourites
+  const [category, setCategory] = useState<"all" | "favourites">("all");
+  const [favs, setFavs] = useState<Set<string>>(() => {
     try {
       const raw = localStorage.getItem("favourites");
-      return new Set(raw ? JSON.parse(raw) : []);
+      return new Set<string>(raw ? (JSON.parse(raw) as string[]) : []);
     } catch {
-      return new Set();
+      return new Set<string>();
     }
   });
 
-  const isFav = (id) => favs.has(id);
-  const toggleFav = (id) =>
+  const isFav = (id: string) => favs.has(id);
+  const toggleFav = (id: string) =>
     setFavs((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+
   useEffect(() => {
     localStorage.setItem("favourites", JSON.stringify([...favs]));
   }, [favs]);
 
-  const [lightboxIdx, setLightboxIdx] = useState(null);
-  const [visibleCount, setVisibleCount] = useState(18);
-  const sentinelRef = useRef(null);
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(18);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
 
   const filtered = useMemo(() => {
     let list = photos;
@@ -61,37 +76,51 @@ export default function GalleryApp() {
       list = list.filter((p) => favs.has(p.id));
     }
     if (sort === "newest") {
-      list = [...list].sort((a, b) => new Date(b.takenAt) - new Date(a.takenAt));
+      list = [...list].sort(
+        (a, b) => +new Date(b.takenAt) - +new Date(a.takenAt)
+      );
     } else if (sort === "oldest") {
-      list = [...list].sort((a, b) => new Date(a.takenAt) - new Date(b.takenAt));
-    } else if (sort === "title") {
+      list = [...list].sort(
+        (a, b) => +new Date(a.takenAt) - +new Date(b.takenAt)
+      );
+    } else {
       list = [...list].sort((a, b) => a.title.localeCompare(b.title));
     }
     return list;
   }, [photos, query, category, sort, favs]);
 
-  const visible = useMemo(() => filtered.slice(0, visibleCount), [filtered, visibleCount]);
+  const visible = useMemo(
+    () => filtered.slice(0, visibleCount),
+    [filtered, visibleCount]
+  );
 
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e) => {
-        if (e.isIntersecting) {
-          setVisibleCount((n) => Math.min(n + 12, filtered.length));
-        }
-      });
-    }, { rootMargin: "600px" });
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting) {
+            setVisibleCount((n) => Math.min(n + 12, filtered.length));
+          }
+        });
+      },
+      { rootMargin: "600px" }
+    );
     io.observe(el);
     return () => io.disconnect();
   }, [filtered.length]);
 
   useEffect(() => {
-    function onKey(e) {
+    function onKey(e: KeyboardEvent) {
       if (lightboxIdx == null) return;
       if (e.key === "Escape") setLightboxIdx(null);
-      if (e.key === "ArrowRight") setLightboxIdx((i) => (i + 1) % filtered.length);
-      if (e.key === "ArrowLeft") setLightboxIdx((i) => (i - 1 + filtered.length) % filtered.length);
+      if (e.key === "ArrowRight")
+        setLightboxIdx((i) => (((i as number) + 1) % filtered.length) as number);
+      if (e.key === "ArrowLeft")
+        setLightboxIdx(
+          (i) => (((i as number) - 1 + filtered.length) % filtered.length) as number
+        );
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -110,7 +139,11 @@ export default function GalleryApp() {
           </div>
         </div>
         <div className="mx-auto max-w-6xl px-4 pb-3">
-          <CategoryTabs value={category} onChange={setCategory} favCount={[...favs].length} />
+          <CategoryTabs
+            value={category}
+            onChange={setCategory}
+            favCount={[...favs].length}
+          />
         </div>
       </header>
 
@@ -134,15 +167,27 @@ export default function GalleryApp() {
           isFav={isFav}
           onToggleFav={() => toggleFav(filtered[lightboxIdx].id)}
           onClose={() => setLightboxIdx(null)}
-          onPrev={() => setLightboxIdx((i) => (i - 1 + filtered.length) % filtered.length)}
-          onNext={() => setLightboxIdx((i) => (i + 1) % filtered.length)}
+          onPrev={() =>
+            setLightboxIdx((i) => (((i as number) - 1 + filtered.length) % filtered.length) as number)
+          }
+          onNext={() =>
+            setLightboxIdx((i) => (((i as number) + 1) % filtered.length) as number)
+          }
         />
       )}
     </div>
   );
 }
 
-function SearchBox({ value, onChange }) {
+/* --- Small UI pieces (with types) --- */
+
+function SearchBox({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
   return (
     <label className="relative block">
       <input
@@ -151,16 +196,24 @@ function SearchBox({ value, onChange }) {
         className="w-full md:w-80 rounded-2xl border border-neutral-300 bg-white px-4 py-2 pr-10 shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
         placeholder="Search photos…"
       />
-      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500">⌘K</span>
+      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500">
+        ⌘K
+      </span>
     </label>
   );
 }
 
-function SortSelect({ value, onChange }) {
+function SortSelect({
+  value,
+  onChange,
+}: {
+  value: "newest" | "oldest" | "title";
+  onChange: (v: "newest" | "oldest" | "title") => void;
+}) {
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(e) => onChange(e.target.value as any)}
       className="rounded-2xl border border-neutral-300 bg-white px-4 py-2 shadow-sm focus:outline-none focus:ring-2 focus:ring-neutral-800"
       title="Sort"
     >
@@ -171,7 +224,15 @@ function SortSelect({ value, onChange }) {
   );
 }
 
-function CategoryTabs({ value, onChange, favCount }) {
+function CategoryTabs({
+  value,
+  onChange,
+  favCount,
+}: {
+  value: "all" | "favourites";
+  onChange: (v: "all" | "favourites") => void;
+  favCount: number;
+}) {
   return (
     <div className="flex items-center gap-2 py-2">
       {[
@@ -180,10 +241,10 @@ function CategoryTabs({ value, onChange, favCount }) {
       ].map((t) => (
         <button
           key={t.key}
-          onClick={() => onChange(t.key)}
+          onClick={() => onChange(t.key as "all" | "favourites")}
           className={classNames(
             "px-3 py-1.5 rounded-full text-sm border",
-            value === t.key
+            value === (t.key as "all" | "favourites")
               ? "bg-neutral-900 text-white border-neutral-900"
               : "bg-white text-neutral-800 border-neutral-300 hover:border-neutral-500"
           )}
@@ -195,7 +256,17 @@ function CategoryTabs({ value, onChange, favCount }) {
   );
 }
 
-function MasonryGrid({ items, onClick, isFav, onToggleFav }) {
+function MasonryGrid({
+  items,
+  onClick,
+  isFav,
+  onToggleFav,
+}: {
+  items: Photo[];
+  onClick: (id: string) => void;
+  isFav: (id: string) => boolean;
+  onToggleFav: (id: string) => void;
+}) {
   return (
     <div className="columns-1 sm:columns-2 lg:columns-3 gap-4 [column-fill:_balance]">
       {items.map((p) => (
@@ -214,17 +285,19 @@ function MasonryGrid({ items, onClick, isFav, onToggleFav }) {
             onClick={() => onToggleFav(p.id)}
             className={classNames(
               "absolute top-2 right-2 rounded-full px-2.5 py-1 text-sm border backdrop-blur bg-white/80 hover:bg-white",
-              isFav(p.id)
-                ? "text-red-600 border-red-600"
-                : "text-neutral-700 border-neutral-300"
+              isFav(p.id) ? "text-red-600 border-red-600" : "text-neutral-700 border-neutral-300"
             )}
             title={isFav(p.id) ? "Remove from favourites" : "Add to favourites"}
           >
             {isFav(p.id) ? "♥" : "♡"}
           </button>
           <figcaption className="p-3 text-sm text-neutral-700 flex items-center justify-between">
-            <span className="truncate" title={p.title}>{p.title}</span>
-            <span className="text-xs text-neutral-500 ml-2">{new Date(p.takenAt).toLocaleDateString()}</span>
+            <span className="truncate" title={p.title}>
+              {p.title}
+            </span>
+            <span className="text-xs text-neutral-500 ml-2">
+              {new Date(p.takenAt).toLocaleDateString()}
+            </span>
           </figcaption>
         </figure>
       ))}
@@ -236,12 +309,26 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 text-center">
       <p className="text-lg font-medium">No photos found</p>
-      <p className="text-neutral-600">Try removing filters or changing your search.</p>
+      <p className="text-neutral-600">Try searching or change category.</p>
     </div>
   );
 }
 
-function Lightbox({ photo, onClose, onPrev, onNext, isFav, onToggleFav }) {
+function Lightbox({
+  photo,
+  onClose,
+  onPrev,
+  onNext,
+  isFav,
+  onToggleFav,
+}: {
+  photo: Photo;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  isFav: (id: string) => boolean;
+  onToggleFav: () => void;
+}) {
   return (
     <div
       role="dialog"
@@ -249,10 +336,7 @@ function Lightbox({ photo, onClose, onPrev, onNext, isFav, onToggleFav }) {
       className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={onClose}
     >
-      <div
-        className="relative max-w-6xl max-h-[85vh] w-full"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="relative max-w-6xl max-h-[85vh] w-full" onClick={(e) => e.stopPropagation()}>
         <img src={photo.src} alt={photo.title} className="mx-auto max-h-[75vh] object-contain w-full" />
         <div className="mt-3 flex items-center justify-between text-white/90">
           <div>
