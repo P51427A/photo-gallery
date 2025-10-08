@@ -40,6 +40,7 @@ export default function GalleryApp() {
   const [photos, setPhotos] = useState<Photo[]>(DEMO_PHOTOS);
   const [query, setQuery] = useState<string>("");
   const [sort, setSort] = useState<"newest" | "oldest" | "title">("newest");
+  const [loaded, setLoaded] = useState(false);
 
   // categories & favourites
   const [category, setCategory] = useState<"all" | "favourites">("all");
@@ -52,7 +53,7 @@ export default function GalleryApp() {
     }
   });
 
-    // ✅ Fetch Cloudinary photos when the app loads
+  // Load from Cloudinary on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -60,13 +61,11 @@ export default function GalleryApp() {
         const res = await fetch("/api/photos", { cache: "no-store" });
         const data = await res.json();
         if (!cancelled && data?.photos) setPhotos(data.photos);
-      } catch (err) {
-        console.error("Failed to load photos:", err);
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
 
@@ -176,18 +175,30 @@ export default function GalleryApp() {
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6">
-        <MasonryGrid
-          items={visible}
-          isFav={isFav}
-          onToggleFav={toggleFav}
-          onClick={(id) => {
-            const idx = filtered.findIndex((p) => p.id === id);
-            if (idx !== -1) setLightboxIdx(idx);
-          }}
-        />
-        <div ref={sentinelRef} className="h-24" />
-        {filtered.length === 0 && <EmptyState />}
-      </main>
+  {!loaded ? (
+    <>
+      {/* ⬅️ loading shimmer */}
+      <SkeletonGrid />
+    </>
+  ) : photos.length === 0 ? (
+    <EmptyState />
+  ) : (
+    <>
+      <MasonryGrid
+        items={visible} // unchanged
+        isFav={isFav}
+        onToggleFav={toggleFav}
+        onClick={(id) => {
+          const idx = filtered.findIndex((p) => p.id === id);
+          if (idx !== -1) setLightboxIdx(idx);
+        }}
+      />
+      <div ref={sentinelRef} className="h-24" />
+    </>
+  )}
+</main>
+
+
 
       {lightboxIdx != null && (
         <Lightbox
@@ -341,6 +352,17 @@ function EmptyState() {
     </div>
   );
 }
+
+function SkeletonGrid() {
+  return (
+    <div className="animate-pulse columns-1 sm:columns-2 lg:columns-3 gap-4">
+      {[...Array(9)].map((_, i) => (
+        <div key={i} className="mb-4 h-56 bg-neutral-200/60 rounded-2xl" />
+      ))}
+    </div>
+  );
+}
+
 
 function Lightbox({
   photo,
